@@ -115,7 +115,7 @@ class OfficeHourRoom:
 
 class OfficeHourManager:
     def __init__(self):
-        self.rooms: Dict[str, OfficeHourRoom] = {}
+        self.rooms: Dict[str, OfficeHourRoom] = {}  # Class ID -> OfficeHourRoom
 
     def get_or_create_room(self, class_id: str) -> OfficeHourRoom:
         if class_id not in self.rooms:

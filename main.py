@@ -1,8 +1,19 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+
 from websocket_manager import OfficeHourManager, Session, Student, TA
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For development only
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 manager = OfficeHourManager()
 
 
