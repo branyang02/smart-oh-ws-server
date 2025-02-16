@@ -1,5 +1,5 @@
 from fastapi import WebSocket, WebSocketDisconnect
-from typing import Dict, List, Set
+from typing import Dict, List
 from collections import OrderedDict
 
 
@@ -7,65 +7,86 @@ class Student:
     def __init__(self, id: str, name: str):
         self.id = id
         self.name = name
-
-    def __eq__(self, other):
-        if not isinstance(other, Student):
-            return False
-        return self.id == other.id
-
-    def __hash__(self):
-        return hash(self.id)
+        self.current_location: str = None  # Session ID | "queue"
 
 
 class TA:
     def __init__(self, id: str, name: str):
         self.id = id
         self.name = name
-        self.current_session: str = None  # Session ID
+        self.current_location: str = None  # Session ID
 
-    def __eq__(self, other):
-        if not isinstance(other, TA):
-            return False
-        return self.id == other.id
 
-    def __hash__(self):
-        return hash(self.id)
+class Queue(OrderedDict):
+    """Student Queue
+
+    Args:
+        OrderedDict: Student ID -> Student
+    """
+
+    def __init__(self, init_queue: OrderedDict = None):
+        super().__init__(init_queue or OrderedDict())
+
+    def add_student(self, student: Student) -> None:
+        self[student.id] = student
+        student.current_location = "queue"
+
+    def remove_student(self, student: Student) -> None:
+        del self[student.id]
+        student.current_location = None
 
 
 class Session:
-    def __init__(self, host_ta: TA):
-        self.tas: Set[TA] = {host_ta}  # Host TA is always in the session
-        host_ta.current_session = host_ta.id
-        self.students: Set[Student] = set()  # Students in the session
-        self.id = host_ta.id  # Using host TA's ID as session ID
+    def __init__(self, id: str):
+        self.id: str = id
+
+        self.tas = OrderedDict()  # TA ID -> TA
+        self.students = OrderedDict()  # Student ID -> Student
 
     def add_ta(self, ta: TA) -> None:
         """Add another TA to the session"""
-        self.tas.add(ta)
-        ta.current_session = self.id
+        self.tas[ta.id] = ta
+        ta.current_location = self.id
 
     def remove_ta(self, ta: TA) -> None:
         """Remove a TA from the session"""
-        self.tas.remove(ta)
-        ta.current_session = None
+        del self.tas[ta.id]
+        ta.current_location = None
 
     def add_student(self, student: Student) -> None:
         """Add a student to the session"""
-        self.students.add(student)
+        self.students[student.id] = student
+        student.current_location = self.id
 
     def remove_student(self, student: Student) -> None:
         """Remove a student from the session"""
-        self.students.remove(student)
+        del self.students[student.id]
+        student.current_location = None
 
     @property
     def student_ids(self) -> List[str]:
         """Get the IDs of all students in the session"""
-        return [student.id for student in self.students]
+        return list(self.students.keys())
 
     @property
     def ta_ids(self) -> List[str]:
         """Get the IDs of all TAs in the session"""
-        return [ta.id for ta in self.tas]
+        return list(self.tas.keys())
+
+    @property
+    def users_state(self):
+        return [
+            {
+                "id": student.id,
+                "name": student.name,
+                "type": "student",
+                "location": self.id,
+            }
+            for student in self.students.values()
+        ] + [
+            {"id": ta.id, "name": ta.name, "type": "TA", "location": self.id}
+            for ta in self.tas.values()
+        ]
 
 
 class OfficeHourRoom:
@@ -76,32 +97,45 @@ class OfficeHourRoom:
         self.students: Dict[str, Student] = {}  # Student ID -> Student
         self.tas: Dict[str, TA] = {}  # TA ID -> TA
 
-        self.queue = OrderedDict()  # Student ID -> Student
-        self.sessions: Dict[
-            str, Session
-        ] = {}  # Session ID (same as host TA id) -> Session
+        self.queue = Queue()  # Student ID -> Student
+        self.sessions: Dict[str, Session] = {}  # Session ID -> Session
+
+    @property
+    def users_state(self):
+        return [
+            {"id": student.id, "name": student.name, "type": "student"}
+            for student in self.students.values()
+        ] + [{"id": ta.id, "name": ta.name, "type": "TA"} for ta in self.tas.values()]
+
+    @property
+    def queue_state(self):
+        return [
+            {
+                "id": student.id,
+                "name": student.name,
+                "type": "student",
+                "location": "queue",
+            }
+            for student in self.queue.values()
+        ]
+
+    @property
+    def sessions_state(self):
+        return {
+            session.id: {
+                "id": session.id,
+                "users": session.users_state,
+            }
+            for session in self.sessions.values()
+        }
 
     async def broadcast_state(self):
-        """Broadcast current state to all connected users"""
+        """Broadcast current state to all connected users. Consistent with frontend types."""
         state = {
             "class_id": self.class_id,
-            "students": [
-                {"id": student.id, "name": student.name}
-                for student in self.students.values()
-            ],
-            "tas": [{"id": ta.id, "name": ta.name} for ta in self.tas.values()],
-            "queue": [
-                {"id": student.id, "name": student.name}
-                for student in self.queue.values()
-            ],
-            "sessions": [
-                {
-                    "session_id": session.id,
-                    "session_tas": session.ta_ids,
-                    "session_students": session.student_ids,
-                }
-                for session in self.sessions.values()
-            ],
+            "all_users": self.users_state,
+            "queue": self.queue_state,
+            "sessions": self.sessions_state,
         }
 
         connections = dict(self.connections)
