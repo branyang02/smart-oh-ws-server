@@ -78,13 +78,18 @@ class Session:
         return [
             {
                 "id": student.id,
+                "columnId": self.id,
                 "name": student.name,
                 "type": "student",
-                "location": self.id,
             }
             for student in self.students.values()
         ] + [
-            {"id": ta.id, "name": ta.name, "type": "TA", "location": self.id}
+            {
+                "id": ta.id,
+                "columnId": self.id,
+                "name": ta.name,
+                "type": "TA",
+            }
             for ta in self.tas.values()
         ]
 
@@ -103,39 +108,53 @@ class OfficeHourRoom:
     @property
     def users_state(self):
         return [
-            {"id": student.id, "name": student.name, "type": "student"}
+            {
+                "id": student.id,
+                "columnId": "none",
+                "name": student.name,
+                "type": "student",
+            }
             for student in self.students.values()
-        ] + [{"id": ta.id, "name": ta.name, "type": "TA"} for ta in self.tas.values()]
+        ] + [
+            {"id": ta.id, "columnId": "none", "name": ta.name, "type": "TA"}
+            for ta in self.tas.values()
+        ]
 
     @property
-    def queue_state(self):
+    def queue_users_state(self):
         return [
             {
                 "id": student.id,
+                "columnId": "queue",
                 "name": student.name,
                 "type": "student",
-                "location": "queue",
             }
             for student in self.queue.values()
         ]
 
     @property
-    def sessions_state(self):
-        return {
-            session.id: {
-                "id": session.id,
-                "users": session.users_state,
-            }
-            for session in self.sessions.values()
-        }
+    def session_users_state(self):
+        return sum([session.users_state for session in self.sessions.values()], [])
 
     async def broadcast_state(self):
         """Broadcast current state to all connected users. Consistent with frontend types."""
         state = {
-            "class_id": self.class_id,
-            "all_users": self.users_state,
-            "queue": self.queue_state,
-            "sessions": self.sessions_state,
+            "classId": self.class_id,
+            "allUsers": self.users_state,
+            "users": self.queue_users_state + self.session_users_state,
+            "columns": [
+                {
+                    "id": "queue",
+                    "title": "Queue",
+                }
+            ]
+            + [
+                {
+                    "id": session.id,
+                    "title": session.id,
+                }
+                for session in self.sessions.values()
+            ],
         }
 
         connections = dict(self.connections)

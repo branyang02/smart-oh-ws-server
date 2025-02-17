@@ -148,6 +148,14 @@ async def basic_test():
     await student9_ws.send(json.dumps({"action": "join_queue"}))
     print("student9 joined the queue")
     time.sleep(0.03)
+    # TA3 creates a session
+    ta3_ws = await connect_user("ta3", "Kate TA", "TA")
+    print("ta3 connected")
+    await ta3_ws.send(
+        json.dumps({"action": "create_session_with_id", "new_session_id": "session-3"})
+    )
+    print("ta3 created a session")
+    time.sleep(0.03)
 
     await receive_messages(ta1_ws)
     return
