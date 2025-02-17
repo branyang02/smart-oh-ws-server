@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 
 async def connect_user(
-    user_id: str, name: str, user_type: str, class_id: str = "cs101"
+    user_id: str, name: str, user_type: str, class_id: str = "class1"
 ):
     """Helper function to connect a user to the websocket"""
     params = urlencode({"user_type": user_type, "name": name})
@@ -157,7 +157,10 @@ async def basic_test():
     print("ta3 created a session")
     time.sleep(0.03)
 
-    await receive_messages(ta1_ws)
+    # await receive_messages(ta1_ws)
+    # keep all connections alive until program ends
+    while True:
+        await asyncio.sleep(1)
     return
     time.sleep(0.03)
     # student 1 accidently disconnects

@@ -1,6 +1,29 @@
+import uuid
 from fastapi import WebSocket, WebSocketDisconnect
+from typing import Literal, TypedDict, Union
 from typing import Dict, List
 from collections import OrderedDict
+
+type User = Union[Student, TA]
+
+
+class UserState(TypedDict):
+    id: str
+    columnId: str  # Session ID | "queue" | "none"
+    name: str
+    type: Literal["student", "TA"]
+
+
+class ColumnState(TypedDict):
+    id: str
+    title: str
+
+
+class RoomState(TypedDict):
+    classId: str
+    allUsers: List[UserState]
+    users: List[UserState]
+    columns: List[ColumnState]
 
 
 class Student:
@@ -17,80 +40,109 @@ class TA:
         self.current_location: str = None  # Session ID
 
 
-class Queue(OrderedDict):
-    """Student Queue
+class Queue:
+    def __init__(self):
+        self.users_list: List[str] = []  # Student IDs
+        self.users_dict: Dict[str, Student] = {}  # Student ID -> Student
 
-    Args:
-        OrderedDict: Student ID -> Student
-    """
+    def add_student(self, student: Student, index: int = None) -> None:
+        if student.id in self.users_dict:
+            raise ValueError("Student is already in the queue")
 
-    def __init__(self, init_queue: OrderedDict = None):
-        super().__init__(init_queue or OrderedDict())
-
-    def add_student(self, student: Student) -> None:
-        self[student.id] = student
         student.current_location = "queue"
+        if index is None or index >= len(self.users_list):
+            self.users_list.append(student.id)
+        else:
+            self.users_list.insert(index, student.id)
+        self.users_dict[student.id] = student
 
     def remove_student(self, student: Student) -> None:
-        del self[student.id]
+        if student.id not in self.users_dict:
+            raise ValueError("Student is not in the queue")
+
+        self.users_list.remove(student.id)
+        del self.users_dict[student.id]
         student.current_location = None
+
+    @property
+    def users_state(self) -> List[UserState]:
+        return [
+            {
+                "id": user_id,
+                "columnId": "queue",
+                "name": self.users_dict[user_id].name,
+                "type": "student",
+            }
+            for user_id in self.users_list
+        ]
 
 
 class Session:
-    def __init__(self, id: str):
-        self.id: str = id
+    def __init__(self, id: str = None):
+        self.id = id
+        self.users_list: List[str] = []  # User IDs
+        self.users_dict: Dict[str, User] = {}  # User ID -> User
 
-        self.tas = OrderedDict()  # TA ID -> TA
-        self.students = OrderedDict()  # Student ID -> Student
+    def add_ta(self, ta: TA, index: int = None) -> None:
+        if ta.id in self.users_dict:
+            raise ValueError("TA is already in the session")
 
-    def add_ta(self, ta: TA) -> None:
-        """Add another TA to the session"""
-        self.tas[ta.id] = ta
         ta.current_location = self.id
+        if index is None or index >= len(self.users_list):
+            self.users_list.append(ta.id)
+        else:
+            self.users_list.insert(index, ta.id)
+        self.users_dict[ta.id] = ta
 
     def remove_ta(self, ta: TA) -> None:
-        """Remove a TA from the session"""
-        del self.tas[ta.id]
+        if ta.id not in self.users_dict:
+            raise ValueError("TA is not in the session")
+
+        self.users_list.remove(ta.id)
+        del self.users_dict[ta.id]
         ta.current_location = None
 
-    def add_student(self, student: Student) -> None:
-        """Add a student to the session"""
-        self.students[student.id] = student
+    def add_student(self, student: Student, index: int = None) -> None:
+        if student.id in self.users_dict:
+            raise ValueError("Student is already in the session")
+
         student.current_location = self.id
+        if index is None or index >= len(self.users_list):
+            self.users_list.append(student.id)
+        else:
+            self.users_list.insert(index, student.id)
+        self.users_dict[student.id] = student
 
     def remove_student(self, student: Student) -> None:
-        """Remove a student from the session"""
-        del self.students[student.id]
+        if student.id not in self.users_dict:
+            raise ValueError("Student is not in the session")
+
+        self.users_list.remove(student.id)
+        del self.users_dict[student.id]
         student.current_location = None
 
     @property
     def student_ids(self) -> List[str]:
         """Get the IDs of all students in the session"""
-        return list(self.students.keys())
+        return [
+            user.id for user in self.users_dict.values() if isinstance(user, Student)
+        ]
 
     @property
     def ta_ids(self) -> List[str]:
         """Get the IDs of all TAs in the session"""
-        return list(self.tas.keys())
+        return [user.id for user in self.users_dict.values() if isinstance(user, TA)]
 
     @property
-    def users_state(self):
+    def users_state(self) -> List[UserState]:
         return [
             {
-                "id": student.id,
+                "id": user_id,
                 "columnId": self.id,
-                "name": student.name,
-                "type": "student",
+                "name": self.users_dict[user_id].name,
+                "type": "TA" if isinstance(self.users_dict[user_id], TA) else "student",
             }
-            for student in self.students.values()
-        ] + [
-            {
-                "id": ta.id,
-                "columnId": self.id,
-                "name": ta.name,
-                "type": "TA",
-            }
-            for ta in self.tas.values()
+            for user_id in self.users_list
         ]
 
 
@@ -102,11 +154,11 @@ class OfficeHourRoom:
         self.students: Dict[str, Student] = {}  # Student ID -> Student
         self.tas: Dict[str, TA] = {}  # TA ID -> TA
 
-        self.queue = Queue()  # Student ID -> Student
-        self.sessions: Dict[str, Session] = {}  # Session ID -> Session
+        self.queue = Queue()
+        self.sessions: OrderedDict[str, Session] = {}  # Session ID -> Session
 
     @property
-    def users_state(self):
+    def users_state(self) -> List[UserState]:
         return [
             {
                 "id": student.id,
@@ -121,24 +173,16 @@ class OfficeHourRoom:
         ]
 
     @property
-    def queue_users_state(self):
-        return [
-            {
-                "id": student.id,
-                "columnId": "queue",
-                "name": student.name,
-                "type": "student",
-            }
-            for student in self.queue.values()
-        ]
+    def queue_users_state(self) -> List[UserState]:
+        return self.queue.users_state
 
     @property
-    def session_users_state(self):
+    def session_users_state(self) -> List[UserState]:
         return sum([session.users_state for session in self.sessions.values()], [])
 
     async def broadcast_state(self):
         """Broadcast current state to all connected users. Consistent with frontend types."""
-        state = {
+        state: RoomState = {
             "classId": self.class_id,
             "allUsers": self.users_state,
             "users": self.queue_users_state + self.session_users_state,

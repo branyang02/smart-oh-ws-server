@@ -1,9 +1,8 @@
 import uuid
-from collections import OrderedDict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 
-from websocket_manager import OfficeHourManager, Queue, Session, Student, TA
+from websocket_manager import OfficeHourManager, Session, Student, TA
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -57,7 +56,7 @@ async def office_hour_websocket(
                 - {action: "leave_queue"}
                 """
                 assert user_id in room.students
-                assert user_id in room.queue
+                assert user_id in room.queue.users_dict
                 student = room.students[user_id]
                 assert student.current_location == "queue"
                 room.queue.remove_student(student)
@@ -105,10 +104,11 @@ async def office_hour_websocket(
             elif action == "join_session" and user_type == "TA":
                 """
                 TA joins a new session, leaving the previous one if they were in one
-                - {action: "join_session", new_session_id: "ta1"}
+                - {action: "join_session", session_id: "ta1", index: 0}
                 """
-                new_session_id = data.get("new_session_id")
-                assert new_session_id in room.sessions
+                session_id = data.get("session_id")
+                index = data.get("index")
+                assert session_id in room.sessions
                 assert user_id in room.tas
                 ta = room.tas[user_id]
 
@@ -118,7 +118,7 @@ async def office_hour_websocket(
                     if len(prev_session.ta_ids) == 0:
                         del room.sessions[prev_session.id]
 
-                room.sessions[new_session_id].add_ta(ta)
+                room.sessions[session_id].add_ta(ta, index)
 
             elif action == "leave_session" and user_type == "TA":
                 """
@@ -136,11 +136,12 @@ async def office_hour_websocket(
 
             elif action == "assign_student_to_session" and user_type == "TA":
                 """
-                {action: "assign_student_to_session", student_id: "student1", session_id: "session-..."}
+                {action: "assign_student_to_session", student_id: "student1", session_id: "session-...", index: 0}
                 """
                 assert user_id in room.tas
                 student_id = data.get("student_id")
                 session_id = data.get("session_id")
+                index = data.get("index")
                 assert student_id in room.students
                 assert session_id in room.sessions
                 ta = room.tas[user_id]
@@ -150,67 +151,43 @@ async def office_hour_websocket(
                 assert student.current_location is not None
 
                 if student.current_location == "queue":
-                    assert student_id in room.queue
+                    assert student_id in room.queue.users_dict
                     room.queue.remove_student(student)
                 elif student.current_location in room.sessions:
                     prev_session = room.sessions[student.current_location]
                     prev_session.remove_student(student)
 
-                session.add_student(student)
+                session.add_student(student, index)
 
-            elif action == "remove_student_from_session" and user_type == "TA":
+            elif action == "assign_student_to_queue" and user_type == "TA":
                 """
-                {action: "remove_student_from_session", student_id: "student1"}
+                {action: "assign_student_to_queue", student_id: "student1", index: 0}
                 """
                 assert user_id in room.tas
+                index = data.get("index")
                 student_id = data.get("student_id")
                 assert student_id in room.students
+                ta = room.tas[user_id]
                 student = room.students[student_id]
-                assert student.current_location in room.sessions
-                session = room.sessions[student.current_location]
-                session.remove_student(student)
+                assert student.current_location is not None
 
-            elif action == "reorder_session" and user_type == "TA":
-                """
-                {action: "reorder_session", session_id: "session-...", student_ids: ["student1", "student2", ...]}
-                """
-                assert user_id in room.tas
-                session_id = data.get("session_id")
-                student_ids = data.get("student_ids")
-                assert session_id in room.sessions
-                session = room.sessions[session_id]
-                assert all(student_id in session.students for student_id in student_ids)
-                session.students = OrderedDict(
-                    (student_id, session.students[student_id])
-                    for student_id in student_ids
-                )
+                if student.current_location == "queue":
+                    assert student_id in room.queue.users_dict
+                    room.queue.remove_student(student)
+                elif student.current_location in room.sessions:
+                    prev_session = room.sessions[student.current_location]
+                    prev_session.remove_student(student)
 
-            elif action == "reorder_queue" and user_type == "TA":
-                """
-                {action: "reorder_queue", student_ids: ["student1", "student2", ...]}
-                """
-                assert user_id in room.tas
-                student_ids = data.get("student_ids")
-                assert all(student_id in room.queue for student_id in student_ids)
-                room.queue = Queue(
-                    OrderedDict(
-                        (student_id, room.queue[student_id])
-                        for student_id in student_ids
-                    )
-                )
+                room.queue.add_student(student, index)
 
             await room.broadcast_state()
             print("Room: ", room.class_id)
             print("Connections:", room.connections.keys())
             print("TAs:", room.tas.keys())
             print("Students:", room.students.keys())
-            print("Queue:", room.queue.keys())
+            print("Queue:", room.queue.users_list)
             print(
-                "Sessions TAs:", [session.ta_ids for session in room.sessions.values()]
-            )
-            print(
-                "Sessions Students:",
-                [session.student_ids for session in room.sessions.values()],
+                "Sessions:", [session.users_list for session in room.sessions.values()]
             )
             print("--" * 30)
 
