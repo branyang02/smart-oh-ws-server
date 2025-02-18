@@ -38,6 +38,7 @@ async def websocket_endpoint(websocket: WebSocket, class_id: str):
 
             except Exception as e:
                 error_message = {"error": str(e)}
+                print(f"Error: {error_message}")
                 await websocket.send_text(json.dumps(error_message))
 
     except WebSocketDisconnect:
