@@ -34,7 +34,7 @@ async def websocket_endpoint(websocket: WebSocket, class_id: str):
             try:
                 new_state = TBoard.model_validate_json(msg)
                 manager.rooms[class_id] = new_state
-                await manager.broadcast(class_id, new_state.json())
+                await manager.broadcast(class_id, new_state.model_dump_json())
 
             except Exception as e:
                 error_message = {"error": str(e)}

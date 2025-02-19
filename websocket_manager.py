@@ -40,7 +40,11 @@ class OfficeHourManager:
 
     def get_or_create_room(self, class_id: str) -> TBoard:
         if class_id not in self.rooms:
-            self.rooms[class_id] = TBoard(classId=class_id, allUsers=[], columns=[])
+            self.rooms[class_id] = TBoard(
+                classId=class_id,
+                allUsers=[],
+                columns=[{"id": "queue", "title": "Queue", "cards": []}],
+            )
         return self.rooms[class_id]
 
     def add_connection(self, class_id: str, websocket: WebSocket) -> None:
