@@ -70,3 +70,26 @@ def get_user_by_session_token(session_token: str) -> User | None:
             return user
     finally:
         connection_pool.putconn(conn)
+
+
+def get_role_by_user_id_class_id(user_id: str, class_id: str) -> str | None:
+    conn = connection_pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT "role"
+                FROM "user_class"
+                WHERE "user_id" = %s AND "class_id" = %s
+                LIMIT 1
+                """,
+                (user_id, class_id),
+            )
+            role_row = cur.fetchone()
+
+            if not role_row:
+                return None
+
+            return role_row[0]
+    finally:
+        connection_pool.putconn(conn)

@@ -36,5 +36,11 @@ class OfficeHourManager:
     async def broadcast(self, class_id: str, data: str) -> None:
         """Send `data` to all clients connected to a particular class."""
         if class_id in self.connections:
+            to_remove = []
             for connection in self.connections[class_id]:
-                await connection.send_text(data)
+                try:
+                    await connection.send_text(data)
+                except Exception:
+                    to_remove.append(connection)
+            for connection in to_remove:
+                self.remove_connection(class_id, connection)

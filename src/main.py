@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.db.db import get_user_by_session_token
+from src.db.db import get_role_by_user_id_class_id, get_user_by_session_token
 from src.websocket.state import TBoard, TCard
 from src.websocket.websocket_manager import OfficeHourManager
 
@@ -45,8 +45,8 @@ async def websocket_endpoint(websocket: WebSocket, class_id: str):
     if not user:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
-
-    role = websocket.query_params.get("role", "student")
+    role = get_role_by_user_id_class_id(user.id, class_id)
+    print(role)
 
     await websocket.accept()
     manager.add_connection(class_id, websocket)
