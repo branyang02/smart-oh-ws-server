@@ -80,6 +80,7 @@ async def authenticate_websocket(websocket: WebSocket, class_id: str):
 
 @app.websocket("/ws/{class_id}")
 async def websocket_endpoint(websocket: WebSocket, class_id: str):
+    logger.info(f"WebSocket connection for class: {class_id}")
     try:
         user, role = await authenticate_websocket(websocket, class_id)
         await websocket.accept()
