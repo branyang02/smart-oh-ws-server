@@ -25,7 +25,7 @@ ENV = os.getenv("ENV", "dev")
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS if ENV == "prod" else ["*"],
+    allow_origins=ALLOWED_ORIGINS if ENV == "production" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
