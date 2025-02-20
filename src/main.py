@@ -4,7 +4,7 @@ import os
 from http.cookies import SimpleCookie
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.db.db import get_role_by_user_id_class_id, get_user_by_session_token
@@ -48,9 +48,7 @@ async def authenticate_websocket(websocket: WebSocket, class_id: str):
     if not cookie_header:
         logger.warning("Missing cookie header")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        raise HTTPException(
-            status_code=status.WS_1008_POLICY_VIOLATION, detail="Missing cookie header"
-        )
+        return
 
     cookies = SimpleCookie()
     cookies.load(cookie_header)
@@ -59,9 +57,7 @@ async def authenticate_websocket(websocket: WebSocket, class_id: str):
     if not session_cookie:
         logger.warning("Missing session token")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        raise HTTPException(
-            status_code=status.WS_1008_POLICY_VIOLATION, detail="Missing session token"
-        )
+        return
 
     session_token = session_cookie.value
 
@@ -70,9 +66,7 @@ async def authenticate_websocket(websocket: WebSocket, class_id: str):
     if not user:
         logger.warning("Invalid session token")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        raise HTTPException(
-            status_code=status.WS_1008_POLICY_VIOLATION, detail="Invalid session token"
-        )
+        return
 
     role = get_role_by_user_id_class_id(user.id, class_id)
     return user, role
@@ -82,7 +76,12 @@ async def authenticate_websocket(websocket: WebSocket, class_id: str):
 async def websocket_endpoint(websocket: WebSocket, class_id: str):
     logger.info(f"WebSocket connection for class: {class_id}")
     try:
-        user, role = await authenticate_websocket(websocket, class_id)
+        auth = await authenticate_websocket(websocket, class_id)
+        if auth is None:
+            # Authentication failed; connection already closed.
+            return
+
+        user, role = auth
         await websocket.accept()
         manager.add_connection(class_id, websocket)
 
