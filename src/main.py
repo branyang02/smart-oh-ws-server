@@ -46,7 +46,6 @@ async def websocket_endpoint(websocket: WebSocket, class_id: str):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
     role = get_role_by_user_id_class_id(user.id, class_id)
-    print(role)
 
     await websocket.accept()
     manager.add_connection(class_id, websocket)
