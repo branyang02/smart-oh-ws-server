@@ -1,8 +1,10 @@
-import os
-from psycopg2 import pool
-from dotenv import load_dotenv
 import datetime
-from state import User
+import os
+
+from dotenv import load_dotenv
+from psycopg2 import pool
+
+from src.websocket.state import User
 
 # Load .env file
 load_dotenv()

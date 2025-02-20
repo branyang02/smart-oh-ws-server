@@ -1,7 +1,6 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel
-from typing import Optional
 
 
 class User(BaseModel):

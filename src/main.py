@@ -1,13 +1,13 @@
 import json
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 from http.cookies import SimpleCookie
 
-
-from db import get_user_by_session_token
-from state import TCard
-from websocket_manager import OfficeHourManager, TBoard
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
+from fastapi.middleware.cors import CORSMiddleware
+
+from src.db.db import get_user_by_session_token
+from src.websocket.state import TBoard, TCard
+from src.websocket.websocket_manager import OfficeHourManager
 
 load_dotenv()
 

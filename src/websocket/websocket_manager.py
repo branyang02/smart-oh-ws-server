@@ -1,7 +1,8 @@
-from fastapi import WebSocket
 from typing import Dict, List
 
-from state import TBoard
+from fastapi import WebSocket
+
+from .state import TBoard
 
 
 class OfficeHourManager:

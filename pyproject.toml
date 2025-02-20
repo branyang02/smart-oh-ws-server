@@ -5,8 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
- "fastapi[standard]>=0.115.8",
- "psycopg2-binary>=2.9.10",
- "pyjwt>=2.10.1",
- "ruff>=0.9.4",
+    "fastapi[standard]>=0.115.8",
+    "psycopg2-binary>=2.9.10",
+    "ruff>=0.9.4",
 ]
+
+[tool.ruff]
+select = ["E", "F", "I"]

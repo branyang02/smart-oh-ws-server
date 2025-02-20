@@ -8,11 +8,5 @@
 
 ```bash
 uv sync # Install dependencies
-uv run fastapi dev main.py
-```
-
-## Test
-
-```bash
-uv run python test.py
+uv run fastapi dev src/main.py # Run the server
 ```
