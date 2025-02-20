@@ -23,6 +23,11 @@ app.add_middleware(
 manager = OfficeHourManager()
 
 
+@app.get("/")
+async def home_endpoint():
+    return {"message": "WebSocket server is running and ready to connect!"}
+
+
 @app.websocket("/ws/{class_id}")
 async def websocket_endpoint(websocket: WebSocket, class_id: str):
     cookie_header = websocket.headers.get("cookie")
