@@ -20,18 +20,22 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
+      - name: Deploy and Restart FastAPI
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            set -e  # Exit immediately if a command exits with a non-zero status
+            set -e  # Stop execution if any command fails
+
+            echo "🚀 Changing to project directory..."
             cd smart-oh-ws-server 
 
-            # Pull latest code
-            git pull origin main  # Change branch if needed
+            echo "🔄 Pulling latest code from GitHub..."
+            git pull origin main  # Change if needed
             
-            # Install dependencies
+            echo "📦 Installing dependencies..."
             uv sync
 
-            # Run the server
-            uv run fastapi run src/main.py
+            echo "🔁 Restarting FastAPI systemd service..."
+            sudo systemctl restart fastapi.service
+
+            echo "✅ Deployment successful!"
           EOF
