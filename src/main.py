@@ -15,9 +15,7 @@ from src.websocket.websocket_manager import OfficeHourManager
 # Load environment variables
 load_dotenv()
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 # Load configuration from environment variables
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
@@ -111,6 +109,8 @@ async def websocket_endpoint(websocket: WebSocket, class_id: str):
                 new_state = TBoard.model_validate_json(msg)
                 manager.rooms[class_id] = new_state
                 await manager.broadcast(class_id, new_state.model_dump_json())
+            except WebSocketDisconnect:
+                raise
             except Exception as e:
                 error_message = {"error": str(e)}
                 logger.error(f"Error processing message: {error_message}")
@@ -119,4 +119,5 @@ async def websocket_endpoint(websocket: WebSocket, class_id: str):
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for class {class_id}")
     finally:
+        logger.info(f"Removing connection for class {class_id}")
         manager.remove_connection(class_id, websocket)
